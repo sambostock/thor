@@ -148,6 +148,7 @@ class Thor
       @assigns[option.human_name] = result
     end
   end
+
     # Check if the current value in peek is a registered switch.
     #
     # Two booleans are returned.  The first is true if the current value
