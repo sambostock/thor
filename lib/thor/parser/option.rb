@@ -139,8 +139,16 @@ class Thor
         @default.class.name.downcase.to_sym
       end
 
-      expected_type = (@repeatable && @type != :hash) ? :array : @type
       raise ArgumentError, "Expected #{expected_type} default value for '#{switch_name}'; got #{@default.inspect} (#{default_type})" unless default_type == expected_type
+    end
+
+    def expected_type
+      case @repeatable
+      when true
+        @type == :hash ? :hash : :array
+      else
+        @type
+      end
     end
 
     def dasherized?
