@@ -136,12 +136,19 @@ class Thor
   def assign_result!(option, result)
     case option.repeatable
     when true
-      if option.type == :hash
-        @assigns[options.human_name] ||= {}
+      @assigns[option.human_name] ||= []
+      @assigns[option.human_name] << result
+
+    when :merge
+      case option.type
+      when :array
+        @assigns[option.human_name] ||= []
+        @assigns[option.human_name].concat(result)
+      when :hash
+        @assigns[option.human_name] ||= {}
         @assigns[option.human_name].merge!(result)
       else
-        @assigns[option.human_name] ||= []
-        @assigns[option.human_name] << result
+        raise "Cannot merge multiple #{option.human_name} options of type #{option.type}"
       end
 
     else

@@ -1,6 +1,32 @@
 require "helper"
 require "thor/parser"
 
+# FIXME: Write tests for true/false/merge/unknown cases for repeatable
+# - repeatable
+#     :string
+#       :unknown raises_error
+#       :merge raises_error
+#       true passes
+#       false passes
+#     :number
+#       :unknown raises_error
+#       :merge raises_error
+#       true passes
+#       false passes
+#     :boolean
+#       :unknown raises_error
+#       :merge raises_error
+#     :array
+#       :unknown raises_error
+#       :merge passes
+#       true passes
+#       false passes
+#     :hash
+#       :unknown raises_error
+#       :merge passes
+#       true passes
+#       false passes
+
 describe Thor::Option do
   def parse(key, value)
     Thor::Option.parse(key, value)
@@ -134,46 +160,104 @@ describe Thor::Option do
     expect(option).to be_required
   end
 
-  it "raises an error if default is inconsistent with type and check_default_type is true" do
-    expect do
-      option("foo_bar", :type => :numeric, :default => "baz", :check_default_type => true)
-    end.to raise_error(ArgumentError, 'Expected numeric default value for \'--foo-bar\'; got "baz" (string)')
+  describe "with repeatable: :merge" do
+    [:boolean, :numeric, :string].each do |type|
+      it "raises an error if type is #{type.inspect}" do
+        expect do
+          option("foo_bar", :type => type, :repeatable => :merge)
+        end.to raise_error(ArgumentError, "only hash, array options types can be merged; got #{type.inspect}") # FIXME
+      end
+    end
+
+    [:array, :hash].each do |type|
+      it "raises an error if type is #{type.inspect}" do
+        expect do
+          option("foo_bar", :type => type, :repeatable => :merge)
+        end.not_to raise_error
+      end
+    end
   end
 
-  it "raises an error if repeatable and default is inconsistent with type and check_default_type is true" do
+  it "raises an error if type is an invalid value" do
     expect do
-      option("foo_bar", :type => :numeric, :repeatable => true, :default => "baz", :check_default_type => true)
-    end.to raise_error(ArgumentError, 'Expected array default value for \'--foo-bar\'; got "baz" (string)')
+      option("foo_bar", :type => :numeric, :repeatable => 'invalid')
+    end.to raise_error(ArgumentError, "Expected valid repeatable setting: true, false, :merge; got: \"invalid\"")
   end
 
-  it "raises an error type hash is repeatable and default is inconsistent with type and check_default_type is true" do
-    expect do
-      option("foo_bar", :type => :hash, :repeatable => true, :default => "baz", :check_default_type => true)
-    end.to raise_error(ArgumentError, 'Expected hash default value for \'--foo-bar\'; got "baz" (string)')
+  describe "with check_default_type: true" do
+    it "raises an error if default is inconsistent with type" do
+      expect do
+        option("foo_bar", :type => :numeric, :default => "baz", :check_default_type => true)
+      end.to raise_error(ArgumentError, 'Expected numeric default value for \'--foo-bar\'; got "baz" (string)')
+    end
+
+    describe "with repeatable: true" do
+      {
+        :boolean => [true],
+        :numeric => [123],
+        :hash => [{}],
+        :array => [[]],
+        :string => ['text'],
+      }.each do |type, default|
+        it "does not raise an error if type is #{type.inspect} and default is an #{default.inspect} (#{default.class})" do
+          expect do
+            option("foo_bar", :type => type, :repeatable => true, :default => default, :check_default_type => true)
+          end.not_to raise_error
+        end
+      end
+
+      {
+        :boolean => { default: true, default_type: :boolean },
+        :numeric => { default: 123, default_type: :numeric },
+        :hash => { default: {}, default_type: :hash },
+        :array => { default: 123, default_type: :numeric },
+        :string => { default: 'text', default_type: :string },
+      }.each do |type, default:, default_type:|
+        it "does not raise an error if type is #{type.inspect} and default is a #{default.inspect} (#{default_type})" do
+          expect do
+            option("foo_bar", :type => type, :repeatable => true, :default => default, :check_default_type => true)
+          end.to raise_error(ArgumentError, "Expected array default value for '--foo-bar'; got #{default.inspect} (#{default_type})")
+        end
+      end
+    end
+
+    describe "with repeatable: :merge" do
+      {
+        :hash => {},
+        :array => [],
+      }.each do |type, default|
+        it "does not raise an error if type is #{type.inspect} and default is an #{default.inspect} (#{default.class})" do
+          expect do
+            option("foo_bar", :type => type, :repeatable => :merge, :default => default, :check_default_type => true)
+          end.not_to raise_error
+        end
+      end
+
+      {
+        :hash => { default: [], default_type: :array },
+        :array => { default: 123, default_type: :numeric },
+      }.each do |type, default:, default_type:|
+        it "does not raise an error if type is #{type.inspect} and default is an #{default.inspect} (#{default.class})" do
+          expect do
+            option("foo_bar", :type => type, :repeatable => :merge, :default => default, :check_default_type => true)
+          end.to raise_error(ArgumentError, "Expected #{type} default value for '--foo-bar'; got #{default.inspect} (#{default_type})")
+        end
+      end
+    end
+
+    it "does not raises an error if default is an symbol and type string" do
+      expect do
+        option("foo", :type => :string, :default => :bar, :check_default_type => true)
+      end.not_to raise_error
+    end
   end
 
-  it "does not raises an error if type hash is repeatable and default is consistent with type and check_default_type is true" do
-    expect do
-      option("foo_bar", :type => :hash, :repeatable => true, :default => {}, :check_default_type => true)
-    end.not_to raise_error
-  end
-
-  it "does not raises an error if repeatable and default is consistent with type and check_default_type is true" do
-    expect do
-      option("foo_bar", :type => :numeric, :repeatable => true, :default => [1], :check_default_type => true)
-    end.not_to raise_error
-  end
-
-  it "does not raises an error if default is an symbol and type string and check_default_type is true" do
-    expect do
-      option("foo", :type => :string, :default => :bar, :check_default_type => true)
-    end.not_to raise_error
-  end
-
-  it "does not raises an error if default is inconsistent with type and check_default_type is false" do
-    expect do
-      option("foo_bar", :type => :numeric, :default => "baz", :check_default_type => false)
-    end.not_to raise_error
+  describe "with check_default_type: false" do
+    it "does not raises an error if default is inconsistent with type" do
+      expect do
+        option("foo_bar", :type => :numeric, :default => "baz", :check_default_type => false)
+      end.not_to raise_error
+    end
   end
 
   it "boolean options cannot be required" do

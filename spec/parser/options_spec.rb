@@ -302,11 +302,30 @@ describe Thor::Options do
             "Expected '--fruit' to be one of #{enum.join(', ')}; got orange")
       end
 
-      it "allows multiple values if repeatable is specified" do
+      it "allows multiple values if repeatable is true" do
         create :foo => Thor::Option.new("foo", :type => :string, :repeatable => true)
 
         expect(parse("--foo=bar", "--foo", "12")["foo"]).to eq(["bar", "12"])
         expect(parse("--foo", "13", "--foo", "14")["foo"]).to eq(["bar", "12", "13", "14"])
+      end
+
+      it "keeps only the last value if repeatable is false" do
+        create :foo => Thor::Option.new("foo", :type => :string, :repeatable => false)
+
+        expect(parse("--foo=bar", "--foo", "12")["foo"]).to eq("12")
+        expect(parse("--foo", "13", "--foo", "14")["foo"]).to eq("14")
+      end
+
+      it "raises if repeatable is set to merge" do
+        expect do
+          create :foo => Thor::Option.new("foo", :type => :string, :repeatable => :merge)
+        end.to raise_error(ArgumentError)
+      end
+
+      it "raises if repeatable is set to an unknown value" do
+        expect do
+          create :foo => Thor::Option.new("foo", :type => :string, :repeatable => :unknown)
+        end.to raise_error(ArgumentError)
       end
     end
 
@@ -369,9 +388,27 @@ describe Thor::Options do
         expect(@opt.remaining).to eq(%w(bar))
       end
 
-      it "allows multiple values if repeatable is specified" do
+      it "allows multiple values if repeatable is true" do
         create :verbose => Thor::Option.new("verbose", :type => :boolean, :aliases => '-v', :repeatable => true)
         expect(parse("-v", "-v", "-v")["verbose"].count).to eq(3)
+      end
+
+      it "keeps only the last value if repeatable is false" do
+        create :foo => Thor::Option.new("verbose", :type => :boolean, :aliases => '-v', :repeatable => false)
+
+        expect(parse("-v", "-v", "-v")["verbose"]).to eq(true)
+      end
+
+      it "raises if repeatable is set to merge" do
+        expect do
+          create :foo => Thor::Option.new("verbose", :type => :boolean, :repeatable => :merge)
+        end.to raise_error(ArgumentError)
+      end
+
+      it "raises if repeatable is set to an unknown value" do
+        expect do
+          create :foo => Thor::Option.new("verbose", :type => :string, :repeatable => :unknown)
+        end.to raise_error(ArgumentError)
       end
     end
 
@@ -396,8 +433,23 @@ describe Thor::Options do
         expect { parse("--attributes", "name:string", "name:integer") }.to raise_error(Thor::MalformattedArgumentError, "You can't specify 'name' more than once in option '--attributes'; got name:string and name:integer")
       end
 
-      it "allows multiple values if repeatable is specified" do
+      it "allows multiple hashes if repeatable is set to true" do
         create :attributes => Thor::Option.new("attributes", :type => :hash, :repeatable => true)
+        expect(parse("--attributes", "name:one", "foo:1", "--attributes", "name:two", "bar:2")["attributes"]).to eq([{"name" => "one", "foo" => "1"}, {"name" => "two", "bar" => "2"}])
+      end
+
+      it "keeps the last hash if repeatable is set to false" do
+        create :attributes => Thor::Option.new("attributes", :type => :hash, :repeatable => false)
+        expect(parse("--attributes", "name:one", "foo:1", "--attributes", "name:two", "bar:2")["attributes"]).to eq({"name"=>"two", "bar" => "2"})
+      end
+
+      it "keeps the last hash if repeatable is omitted" do
+        create :attributes => Thor::Option.new("attributes", :type => :hash)
+        expect(parse("--attributes", "name:one", "foo:1", "--attributes", "name:two", "bar:2")["attributes"]).to eq({"name"=>"two", "bar" => "2"})
+      end
+
+      it "merges the hashes if repeatable is set to :merge" do
+        create :attributes => Thor::Option.new("attributes", :type => :hash, :repeatable => :merge)
         expect(parse("--attributes", "name:one", "foo:1", "--attributes", "name:two", "bar:2")["attributes"]).to eq({"name"=>"two", "foo"=>"1", "bar" => "2"})
       end
     end
@@ -419,9 +471,30 @@ describe Thor::Options do
         expect(parse("--attributes", "a", "b", "c", "--baz", "cool")["attributes"]).to eq(%w(a b c))
       end
 
-      it "allows multiple values if repeatable is specified" do
+      it "keeps multiple arrays if repeatable is set to true" do
         create :attributes => Thor::Option.new("attributes", :type => :array, :repeatable => true)
         expect(parse("--attributes", "1", "2", "--attributes", "3", "4")["attributes"]).to eq([["1", "2"], ["3", "4"]])
+      end
+
+      it "concatenates each array if repeatable is set to :merge" do
+        create :attributes => Thor::Option.new("attributes", :type => :array, :repeatable => :merge)
+        expect(parse("--attributes", "1", "2", "--attributes", "3", "4")["attributes"]).to eq(["1", "2", "3", "4"])
+      end
+
+      it "keeps the last array if repeatable is set to false" do
+        create :attributes => Thor::Option.new("attributes", :type => :array, :repeatable => false)
+        expect(parse("--attributes", "1", "2", "--attributes", "3", "4")["attributes"]).to eq(["3", "4"])
+      end
+
+      it "keeps the last array if repeatable is omitted" do
+        create :attributes => Thor::Option.new("attributes", :type => :array)
+        expect(parse("--attributes", "1", "2", "--attributes", "3", "4")["attributes"]).to eq(["3", "4"])
+      end
+
+      it "raises if repeatable is set to an unknown value" do
+        expect do
+          create :attributes => Thor::Option.new("attributes", :type => :array, :repeatable => :unknown)
+        end.to raise_error(ArgumentError)
       end
     end
 
@@ -450,9 +523,31 @@ describe Thor::Options do
                                                         "Expected '--limit' to be one of #{enum.join(', ')}; got 3")
       end
 
-      it "allows multiple values if repeatable is specified" do
+      it "allows multiple values if repeatable is set to true" do
         create :run => Thor::Option.new("run", :type => :numeric, :repeatable => true)
         expect(parse("--run", "1", "--run", "2")["run"]).to eq([1, 2])
+      end
+
+      it "keeps the last value if repeatable is set to false" do
+        create :run => Thor::Option.new("run", :type => :numeric, :repeatable => false)
+        expect(parse("--run", "1", "--run", "2")["run"]).to eq(2)
+      end
+
+      it "keeps the last value if repeatable is omitted" do
+        create :run => Thor::Option.new("run", :type => :numeric)
+        expect(parse("--run", "1", "--run", "2")["run"]).to eq(2)
+      end
+
+      it "raises if repeatable set to :merge" do
+        expect do
+          create :run => Thor::Option.new("run", :type => :numeric, :repeatable => :merge)
+        end.to raise_error(ArgumentError)
+      end
+
+      it "raises if repeatable set to unknown value" do
+        expect do
+          create :run => Thor::Option.new("run", :type => :numeric, :repeatable => :unknown)
+        end.to raise_error(ArgumentError)
       end
     end
   end

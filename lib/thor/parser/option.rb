@@ -3,6 +3,7 @@ class Thor
     attr_reader :aliases, :group, :lazy_default, :hide, :repeatable
 
     VALID_TYPES = [:boolean, :numeric, :hash, :array, :string]
+    MERGEABLE_TYPES = [:hash, :array]
 
     def initialize(name, options = {})
       @check_default_type = options[:check_default_type]
@@ -120,8 +121,10 @@ class Thor
       case @repeatable
       when true, false
         return
+      when :merge
+        raise ArgumentError, "only #{MERGEABLE_TYPES.join(', ')} options types can be merged; got #{@type.inspect}" unless MERGEABLE_TYPES.include?(@type)
       else
-        raise ArgumentError, "Expected valid repeatable setting: true, false; got: #{@repeatable.inspect}"
+        raise ArgumentError, "Expected valid repeatable setting: true, false, :merge; got: #{@repeatable.inspect}"
       end
     end
 
@@ -144,8 +147,10 @@ class Thor
 
     def expected_type
       case @repeatable
+      when :merge
+        @type
       when true
-        @type == :hash ? :hash : :array
+        :array # TODO: Technically, we should validate each element is the expected type
       else
         @type
       end
