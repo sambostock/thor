@@ -112,7 +112,17 @@ class Thor
 
     def validate!
       raise ArgumentError, "An option cannot be boolean and required." if boolean? && required?
+      validate_repeatable!
       validate_default_type! if @check_default_type
+    end
+
+    def validate_repeatable!
+      case @repeatable
+      when true, false
+        return
+      else
+        raise ArgumentError, "Expected valid repeatable setting: true, false; got: #{@repeatable.inspect}"
+      end
     end
 
     def validate_default_type!
